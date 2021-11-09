@@ -83,6 +83,11 @@ void handle_recv_from_network(char* tinytcp_pkt,
         tinytcp_conn_t* tinytcp_conn = tinytcp_create_conn();
 
         //TODO initialize tinytcp_conn attributes. filename is contained in data
+        memcpy(tinytcp_conn->filename, data, data_size);
+        tinytcp_conn->curr_state = SYN_RECVD;
+        tinytcp_conn->src_port = dst_port;
+        tinytcp_conn->dst_port = src_port;
+        tinytcp_conn->seq_num = rand();
 
         char filepath[500];
         strcpy(filepath, "recvfiles/");
@@ -97,6 +102,8 @@ void handle_recv_from_network(char* tinytcp_pkt,
                 src_port, dst_port, seq_num, ack_num);
 
         //TODO update tinytcp_conn attributes
+        tinytcp_conn->ack_num = seq_num + 1;
+        tinytcp_conn->curr_state = SYN_ACK_SENT;
 
         fprintf(stderr, "\nSYN-ACK sending "
                 "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
@@ -104,14 +111,23 @@ void handle_recv_from_network(char* tinytcp_pkt,
                 tinytcp_conn->seq_num, tinytcp_conn->ack_num);
 
         //TODO send SYN-ACK
+        char* tinytcp_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
+            tinytcp_conn->dst_port, tinytcp_conn->seq_num,
+            tinytcp_conn->ack_num, 1, 1, 0, data, data_size);
+        send_to_network(tinytcp_pkt, TINYTCP_HDR_SIZE + data_size);
 
     } else if (syn == 1 && ack == 1) { //SYN-ACK recvd
+
         //get tinytcp connection
         tinytcp_conn_t* tinytcp_conn = tinytcp_get_conn(dst_port, src_port);
         assert(tinytcp_conn != NULL);
 
         if (tinytcp_conn->curr_state == SYN_SENT) {
             //TODO update tinytcp_conn attributes
+            //SYN_ACK received
+            tinytcp_conn->curr_state = SYN_ACK_RECVD;
+            tinytcp_conn->seq_num += 1;
+            tinytcp_conn->ack_num = seq_num + 1;
 
             fprintf(stderr, "\nSYN-ACK recvd "
                     "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
@@ -159,7 +175,7 @@ void handle_recv_from_network(char* tinytcp_pkt,
 
         if (tinytcp_conn->curr_state == SYN_ACK_SENT) { //conn set up ACK
             //TODO update tinytcp_conn attributes
-
+            tinytcp_conn->curr_state = CONN_ESTABLISHED;
             fprintf(stderr, "\nACK recvd "
                     "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
                     src_port, dst_port, seq_num, ack_num);
@@ -202,6 +218,11 @@ int tinytcp_connect(tinytcp_conn_t* tinytcp_conn,
                     uint16_t data_size)
 {
     //TODO initialize tinytcp_conn attributes. filename is contained in data
+    tinytcp_conn->src_port = cliport;
+    tinytcp_conn->dst_port = servport;
+    memcpy(tinytcp_conn->filename, data, data_size);
+    tinytcp_conn->seq_num = rand();
+
 
     fprintf(stderr, "\nSYN sending "
             "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
@@ -212,6 +233,9 @@ int tinytcp_connect(tinytcp_conn_t* tinytcp_conn,
     char* tinytcp_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
             tinytcp_conn->dst_port, tinytcp_conn->seq_num,
             tinytcp_conn->ack_num, 0, 1, 0, data, data_size);
+    
+    //change state to SYN_SENT
+    tinytcp_conn->curr_state = SYN_SENT;
     send_to_network(tinytcp_pkt, TINYTCP_HDR_SIZE + data_size);
 
     //wait for SYN-ACK
@@ -220,13 +244,18 @@ int tinytcp_connect(tinytcp_conn_t* tinytcp_conn,
     }
 
     //TODO update tinytcp_conn attributes
-
+     
+    tinytcp_conn->curr_state = CONN_ESTABLISHED;
     fprintf(stderr, "\nACK sending "
             "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
             tinytcp_conn->src_port, tinytcp_conn->dst_port,
             tinytcp_conn->seq_num, tinytcp_conn->ack_num);
 
     //TODO send ACK
+    tinytcp_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
+            tinytcp_conn->dst_port, tinytcp_conn->seq_num,
+            tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
+    send_to_network(tinytcp_pkt, TINYTCP_HDR_SIZE + data_size);
 
     fprintf(stderr, "\nconnection established...sending file %s\n\n",
             tinytcp_conn->filename);
