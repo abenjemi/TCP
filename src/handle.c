@@ -44,17 +44,21 @@ void* handle_send_to_network(void* args)
 
                 if (timer_expired(tinytcp_conn->time_last_new_data_acked)) {
                     //TODO do someting
+                                      
                 }
 
                 //TODO do something else
-                char * data = get_ring_buffer_data(tinytcp_conn->send_buffer);
-                uint16_t data_size = strlen(data);
+                char * data = malloc(sizeof(char *) * MSS);
+                uint32_t data_size = ring_buffer_remove(tinytcp_conn->send_buffer,
+                            data,
+                            MSS);
+                
                 tinytcp_conn->seq_num += 1;
                 char* data_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
                 tinytcp_conn->dst_port, tinytcp_conn->seq_num,
                 tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
-                
                 send_to_network(data_pkt, TINYTCP_HDR_SIZE + data_size);
+                free(data);
 
                 //TODO make call_send_to_network = 1 everytime you make a call to send_to_network()
                 call_send_to_network = 1;
@@ -222,14 +226,26 @@ void handle_recv_from_network(char* tinytcp_pkt,
             //implement this only if you are sending any data.. not necessary for
             //initial parts of the assignment!
 
-            //TODO handle received data packets
-            tinytcp_conn->ack_num += 1;
-            
+            //TODO handle received data packets    
+            uint32_t bytes = ring_buffer_add(tinytcp_conn->recv_buffer, data, data_size);
+
+
 
             //TODO reset timer (i.e., set time_last_new_data_acked to clock())
             //every time some *new* data has been ACKed
+            tinytcp_conn->time_last_new_data_acked = clock();
+
+            
 
             //TODO send back an ACK (if needed).
+            // if (bytes > 0)
+            // {
+            //     tinytcp_conn->seq_num += 1;
+            //     tinytcp_conn->ack_num = seq_num + 1; 
+            //     char * ack_pkt = create_tinytcp_pkt(tinytcp_conn->src_port, tinytcp_conn->dst_port, tinytcp_conn->seq_num, tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
+            //     send_to_network(ack_pkt, tinytcp_pkt_size);
+            // }
+
         }
     }
 }
@@ -280,6 +296,8 @@ int tinytcp_connect(tinytcp_conn_t* tinytcp_conn,
             tinytcp_conn->seq_num, tinytcp_conn->ack_num);
 
     //TODO send ACK
+    data = '\0';
+    data_size = 0;
     tinytcp_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
             tinytcp_conn->dst_port, tinytcp_conn->seq_num,
             tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
