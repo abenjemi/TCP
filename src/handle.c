@@ -80,7 +80,7 @@ void* handle_send_to_network(void* args)
                     if (send_now[i] == 1)
                     {
                         tinytcp_conn->seq_num += MSS;
-                        tinytcp_conn->ack_num = send_now[i] + 100;
+                        // tinytcp_conn->ack_num = send_now[i] + 100;
                         char* data_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
                         tinytcp_conn->dst_port, tinytcp_conn->seq_num,
                         tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
@@ -296,6 +296,7 @@ void handle_recv_from_network(char* tinytcp_pkt,
                 {
                     // if not enough space in the receive buffer wait for more empty space
                     while(data_size > empty_space(tinytcp_conn->recv_buffer));
+                    tinytcp_conn->seq_num += 1;
 
                     // add data received to receive buffer
                     uint32_t bytes = ring_buffer_add(tinytcp_conn->recv_buffer, data, data_size);
@@ -305,25 +306,30 @@ void handle_recv_from_network(char* tinytcp_pkt,
                 // send ack to client
                 data = '\0';
                 data_size = 0;
-                 
+                
                 char * ack_pkt = create_tinytcp_pkt(tinytcp_conn->src_port, tinytcp_conn->dst_port, tinytcp_conn->seq_num, seq_num + MSS, 1, 0, 0, data, data_size);
                 send_to_network(ack_pkt, TINYTCP_HDR_SIZE + data_size);
                    
             }
             else
             {
-                //TODO reset timer (i.e., set time_last_new_data_acked to clock()) every time some *new* data has been ACKed
-                tinytcp_conn->time_last_new_data_acked = clock();
+                if (seq_num == tinytcp_conn->ack_num)
+                {
+                    //TODO reset timer (i.e., set time_last_new_data_acked to clock()) every time some *new* data has been ACKed
+                    tinytcp_conn->time_last_new_data_acked = clock();
+                    tinytcp_conn->ack_num += 1; 
 
-                // remove acked data from send buffer
-                char * dst_buffer = malloc(sizeof(char) * (MSS + 1));
-                uint32_t bytes_read = ring_buffer_remove(tinytcp_conn->send_buffer, dst_buffer, MSS);
-                free(dst_buffer);
+                    // remove acked data from send buffer
+                    char * dst_buffer = malloc(sizeof(char) * (MSS + 1));
+                    uint32_t bytes_read = ring_buffer_remove(tinytcp_conn->send_buffer, dst_buffer, MSS);
+                    free(dst_buffer);
 
-                int index = (tinytcp_conn->src_port % 3000) - 1;
+                    int index = (tinytcp_conn->src_port % 3000) - 1;
 
-                // send next data packet
-                send_now[index] = 1;                
+                    // send next data packet
+                    send_now[index] = 1;
+
+                }                
             }
 
         }
