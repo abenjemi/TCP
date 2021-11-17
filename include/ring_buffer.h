@@ -40,6 +40,4 @@ uint32_t occupied_space(ring_buffer_t* buffer,
 
 void free_ring_buffer(ring_buffer_t* buffer);
 
-uint32_t ring_buffer_read(ring_buffer_t * buffer, char* dst_buff, uint32_t bytes);
-
 #endif
