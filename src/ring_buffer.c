@@ -205,3 +205,29 @@ void free_ring_buffer(ring_buffer_t* buffer)
         free(buffer);
     }
 }
+
+uint32_t ring_buffer_read(ring_buffer_t * buffer, char* dst_buff, uint32_t bytes)
+{
+    if (buffer == NULL) {
+        fprintf(stderr, "error ring_buffer_read: buffer is NULL\n");
+        exit(1);
+    }
+
+    uint32_t occupied = occupied_space(buffer, NULL);
+    if (bytes > occupied) {
+        bytes = occupied;
+    }
+
+    uint32_t start_idx = buffer->head % buffer->capacity;
+    if (dst_buff != NULL && bytes > 0) {
+        if (start_idx + bytes <= buffer->capacity) {
+            memcpy(dst_buff, (buffer->data + start_idx), bytes);
+        } else {
+            uint32_t diff = bytes - (buffer->capacity - start_idx);
+            memcpy(dst_buff, (buffer->data + start_idx),
+                    (buffer->capacity - start_idx));
+            memcpy(dst_buff + (buffer->capacity - start_idx), buffer->data, diff);
+        }
+    }
+    return bytes; 
+}

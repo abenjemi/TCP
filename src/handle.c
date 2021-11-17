@@ -19,6 +19,10 @@
 #include "tinytcp.h"
 #include "handle.h"
 
+// uint32_t ring_buffer_read(ring_buffer_t* buffer, char* dst_buff, uint32_t bytes);
+
+// struct ring_buffer ring_buffer_t;
+
 // int send_now = 1;
 int send_now[5] = {1, 1, 1, 1, 1};
 
@@ -28,6 +32,33 @@ int send_now[5] = {1, 1, 1, 1, 1};
 
 // struct ring_buffer;
 // typedef struct ring_buffer ring_buffer_t;
+
+//reads data from buffer and returns the number of bytes read
+// uint32_t ring_buffer_read(ring_buffer_t* buffer, char* dst_buff, uint32_t bytes)
+// {
+//     if (buffer == NULL) {
+//         fprintf(stderr, "error ring_buffer_read: buffer is NULL\n");
+//         exit(1);
+//     }
+
+//     uint32_t occupied = occupied_space(buffer, NULL);
+//     if (bytes > occupied) {
+//         bytes = occupied;
+//     }
+
+//     uint32_t start_idx = buffer->head % buffer->capacity;
+//     if (dst_buff != NULL && bytes > 0) {
+//         if (start_idx + bytes <= buffer->capacity) {
+//             memcpy(dst_buff, (buffer->data + start_idx), bytes);
+//         } else {
+//             uint32_t diff = bytes - (buffer->capacity - start_idx);
+//             memcpy(dst_buff, (buffer->data + start_idx),
+//                     (buffer->capacity - start_idx));
+//             memcpy(dst_buff + (buffer->capacity - start_idx), buffer->data, diff);
+//         }
+//     }
+//     return bytes; 
+// }
 
 void* handle_send_to_network(void* args)
 {
@@ -105,8 +136,7 @@ void* handle_send_to_network(void* args)
                         char* data_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
                         tinytcp_conn->dst_port, tinytcp_conn->seq_num,
                         tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
-                        send_to_network(data_pkt, TINYTCP_HDR_SIZE + data_size);
-                        // send_now[i] = 0;                        
+                        send_to_network(data_pkt, TINYTCP_HDR_SIZE + data_size);                    
                     }
                 }
 
@@ -227,6 +257,7 @@ void handle_recv_from_network(char* tinytcp_pkt,
             tinytcp_conn->seq_num = ack_num;
             tinytcp_conn->ack_num = seq_num + 1;
             
+            
             fprintf(stderr, "\nFIN-ACK sending "
                     "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
                     tinytcp_conn->src_port, tinytcp_conn->dst_port,
@@ -270,6 +301,8 @@ void handle_recv_from_network(char* tinytcp_pkt,
         } else if (tinytcp_conn->curr_state == FIN_ACK_SENT) { //conn terminate ACK
             //TODO update tinytcp_conn attributes
             tinytcp_conn->curr_state = CONN_TERMINATED;
+            free_ring_buffer(tinytcp_conn->send_buffer);
+            free_ring_buffer(tinytcp_conn->recv_buffer);
 
             fprintf(stderr, "\nACK recvd "
                     "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
@@ -424,6 +457,8 @@ void handle_close(tinytcp_conn_t* tinytcp_conn)
     //TODO update tinytcp_conn attributes
     tinytcp_conn->curr_state = CONN_TERMINATED;
     tinytcp_conn->seq_num += 1;
+    free_ring_buffer(tinytcp_conn->send_buffer);
+    free_ring_buffer(tinytcp_conn->recv_buffer);
 
     fprintf(stderr, "\nACK sending "
             "(src_port:%u dst_port:%u seq_num:%u ack_num:%u)\n",
@@ -446,28 +481,3 @@ void handle_close(tinytcp_conn_t* tinytcp_conn)
 
 
 
-// uint32_t ring_buffer_read(ring_buffer_t * buffer, char* dst_buff, uint32_t bytes)
-// {
-//     if (buffer == NULL) {
-//         fprintf(stderr, "error ring_buffer_read: buffer is NULL\n");
-//         exit(1);
-//     }
-
-//     uint32_t occupied = occupied_space(buffer, NULL);
-//     if (bytes > occupied) {
-//         bytes = occupied;
-//     }
-
-//     uint32_t start_idx = buffer->head % buffer->capacity;
-//     if (dst_buff != NULL && bytes > 0) {
-//         if (start_idx + bytes <= buffer->capacity) {
-//             memcpy(dst_buff, (buffer->data + start_idx), bytes);
-//         } else {
-//             uint32_t diff = bytes - (buffer->capacity - start_idx);
-//             memcpy(dst_buff, (buffer->data + start_idx),
-//                     (buffer->capacity - start_idx));
-//             memcpy(dst_buff + (buffer->capacity - start_idx), buffer->data, diff);
-//         }
-//     }
-//     return bytes; 
-// }
