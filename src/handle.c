@@ -143,7 +143,8 @@ void* handle_send_to_network(void* args)
                         char* data_pkt = create_tinytcp_pkt(tinytcp_conn->src_port,
                         tinytcp_conn->dst_port, tinytcp_conn->seq_num,
                         tinytcp_conn->ack_num, 1, 0, 0, data, data_size);
-                        send_to_network(data_pkt, TINYTCP_HDR_SIZE + data_size);                    
+                        send_to_network(data_pkt, TINYTCP_HDR_SIZE + data_size);
+                        call_send_to_network = 1;
                     }
                 }
 
